@@ -43,8 +43,11 @@ header h1 span{color:var(--acc)}
 #tipBox{margin-top:8px;background:var(--card2);border:1px solid var(--line);border-radius:10px;
   padding:9px 11px;font-size:12.5px;color:var(--dim);line-height:1.5}
 #tipBox b{color:var(--fg)}
-.stat{cursor:pointer}
+[data-tip]{cursor:pointer}
 .stat.sel{outline:1px solid var(--acc)}
+#updBar{position:fixed;left:12px;right:12px;bottom:calc(12px + env(safe-area-inset-bottom));
+  background:var(--acc);color:#04130a;border-radius:12px;padding:11px 14px;text-align:center;
+  font-weight:700;font-size:14px;z-index:60;box-shadow:0 4px 18px rgba(0,0,0,.5)}
 #engine{margin-top:8px;font-size:13px;color:var(--dim)}
 #engine b{color:var(--fg)}
 canvas{display:block;width:100%}
@@ -107,12 +110,12 @@ input.decl{width:52px;background:var(--card2);border:1px solid var(--line);color
       <div class="stat" data-tip="eta"><b id="vEta">–</b><span>L1 lead ⓘ</span></div>
     </div>
     <div id="tipBox" hidden></div>
-    <div id="engine">Engine: <b>–</b></div>
+    <div id="engine" data-tip="engine">Engine: <b>–</b> ⓘ</div>
     <div class="stamp" id="stampSw">–</div>
   </div>
 
   <div class="card">
-    <h2>Find it — compass</h2>
+    <h2 data-tip="compass">Find it — compass ⓘ</h2>
     <canvas id="cvCompass" width="280" height="280"></canvas>
     <div class="point">
       <div class="pbox"><div class="big" id="turnTxt">–</div><div class="sub">rotate</div></div>
@@ -122,32 +125,32 @@ input.decl{width:52px;background:var(--card2);border:1px solid var(--line);color
   </div>
 
   <div class="card">
-    <h2>Sky view — where the glow should sit</h2>
+    <h2 data-tip="sky">Sky view — where the glow should sit ⓘ</h2>
     <canvas id="cvDome" height="210"></canvas>
     <div class="stamp" id="stampOv">–</div>
   </div>
 
   <div class="card">
-    <h2>Clouds next hours</h2>
+    <h2 data-tip="clouds">Clouds next hours ⓘ</h2>
     <canvas id="cvClouds" height="130"></canvas>
     <div id="cloudNote">–</div>
   </div>
 
   <div class="card">
-    <h2>Kp outlook (NOAA, UTC days)</h2>
+    <h2 data-tip="outlook">Kp outlook (NOAA, UTC days) ⓘ</h2>
     <table id="fcTable"><tr><td>loading…</td></tr></table>
   </div>
 
   <div class="foot">
     <div id="vPlace">📍 –</div>
-    <div>Geomagnetic lat <span id="vGm">–</span> · Sun <span id="vSun">–</span> ·
-      Compass correction <input class="decl" id="vDecl" type="number" step="1" value="0">° E</div>
+    <div data-tip="terms">Geomagnetic lat <span id="vGm">–</span> · Sun <span id="vSun">–</span> ·
+      Compass correction <input class="decl" id="vDecl" type="number" step="1" value="0">° E ⓘ</div>
     <div>Live: NOAA SWPC (OVATION oval · 1-min Kp · DSCOVR solar wind) + Open-Meteo clouds.
       Refreshes itself; ↻ forces. Your location never leaves the phone.</div>
     <div>June at 53°N never gets fully dark — expect a low green band, not curtains.
       A 5–10 s night-mode photo sees more than your eyes.</div>
   </div>
 </div>
-<script src="app.js?v=102"></script>
+<script src="app.js?v=103"></script>
 </body>
 </html>

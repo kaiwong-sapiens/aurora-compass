@@ -131,6 +131,8 @@ if (typeof module !== 'undefined') {
 /* ---------------- DOM app ---------------- */
 if (typeof window !== 'undefined' && typeof document !== 'undefined') {
 
+const APP_VERSION = 103;
+
 const URLS = {
   kp: 'https://services.swpc.noaa.gov/json/planetary_k_index_1m.json',
   mag: 'https://services.swpc.noaa.gov/products/solar-wind/mag-1-day.json',
@@ -414,7 +416,7 @@ function tick(t) {
     eng.innerHTML = 'Engine: <b>' + (S.bz <= -5 ? 'SURGING — Bz strongly south; watch the next ' :
       S.bz < 0 ? 'favourable — Bz south; mild activity possible in ~' :
       'idle — Bz north; little energy coupling for the next ~') +
-      (S.speed ? Math.round(L1_KM / S.speed / 60) + ' min' : '–') + '</b>';
+      (S.speed ? Math.round(L1_KM / S.speed / 60) + ' min' : '–') + '</b> ⓘ';
   }
   const v = makeVerdict(S.aur, S.sun, cloudNow(), S.bz);
   $('verdict').textContent = v.label; $('verdict').className = v.cls; $('vnote').textContent = v.note;
@@ -439,22 +441,32 @@ function loop(t) {
   requestAnimationFrame(loop);
 }
 
-/* ---- stat tooltips ---- */
+/* ---- jargon tooltips: tap any ⓘ element ---- */
 const TIPS = {
   kp: '<b>Kp — global aurora activity, 0–9.</b> How disturbed Earth\'s magnetic field is (1-minute estimate here). From Jasper\'s latitude the band usually reaches your sky at <b>Kp ≈ 4</b>; Kp 5+ is storm level and can put it overhead. Kp looks BACK (3-h average) — for what\'s coming, watch Bz.',
   bz: '<b>Bz — the door. North–south tilt of the solar wind\'s magnetic field, in nanotesla.</b> Earth\'s field points north, so a SOUTH (negative) Bz lets the fields reconnect and aurora energy pour in. <b>≤ −5 = good zone (green)</b>; below −10 for an hour = storm. Positive/north = door shut, even in fast wind.',
   wind: '<b>Solar-wind speed at DSCOVR.</b> Calm sun ~350–400 km/s. 500–700+ km/s (high-speed stream or CME) makes any south-Bz hit much harder — speed × south-field = power.',
-  eta: '<b>L1 lead — your early warning.</b> DSCOVR floats 1.5 M km sunward, so what it measures now arrives at Earth in about this many minutes. If Bz dives south, you have roughly this long to get outside before the sky responds.'
+  eta: '<b>L1 lead — your early warning.</b> DSCOVR floats 1.5 M km sunward, so what it measures now arrives at Earth in about this many minutes. If Bz dives south, you have roughly this long to get outside before the sky responds.',
+  engine: '<b>Engine = is energy flowing in right now?</b> Combines Bz direction with wind speed: <b>surging</b> (Bz ≤ −5 — get outside soon), <b>favourable</b> (Bz south — door ajar), <b>idle</b> (Bz north — door shut). The minutes are the L1 lead: how long until what DSCOVR sees now reaches Earth.',
+  compass: '<b>How to use:</b> the dial turns with your phone — red N is true north, the <b>green arc is where the aurora band sits</b>. “Rotate” says how far to turn (✓ when you\'re facing it), “tilt” is how high above the horizon to look (0° = flat horizon), “band edge” is the ground distance to where the glow starts.',
+  sky: '<b>OVATION</b> is NOAA\'s live model of the auroral oval, updated every few minutes from the solar wind measured ~40 min upstream. The green band is where the glow should sit in <b>your</b> sky; the crosshair is where your phone points. The shimmer is simulated — brightness scales with the model\'s intensity.',
+  clouds: '<b>Low / Mid / High = three cloud layers</b> for your exact spot, next 12 h — darker cell = more cloud. Low cloud kills the show; thin high cirrus often doesn\'t (bright aurora shines through). The note below picks tonight\'s clearest window.',
+  outlook: '<b>NOAA\'s 3-day forecast — max Kp per UTC day.</b> A UTC day starts at 18:00 MDT the evening before, so a date here mostly covers THAT night\'s dark hours. ≥4 reaches Jasper\'s sky; ≥5 is a storm, visible much farther south.',
+  terms: '<b>Geomagnetic lat</b> — your latitude measured from the magnetic pole, the one aurora cares about (Jasper: 53° geographic ≈ 59° magnetic — why it\'s great aurora country). <b>Sun</b> — degrees below the horizon; you want ≤ −6°, and June here bottoms out ~−13°. <b>Compass correction</b> — phones point at magnetic north; true north differs by ~+13°E in the Rockies. Auto-set; edit if you know better.'
 };
 let tipSel = null;
-$('statGrid').addEventListener('click', e => {
-  const st = e.target.closest('.stat');
-  if (!st) return;
-  const key = st.dataset.tip, box = $('tipBox');
-  document.querySelectorAll('.stat').forEach(s => s.classList.remove('sel'));
+document.addEventListener('click', e => {
+  if (e.target.tagName === 'INPUT') return;
+  const t = e.target.closest('[data-tip]');
+  if (!t) return;
+  const key = t.dataset.tip, box = $('tipBox');
+  document.querySelectorAll('.sel').forEach(s => s.classList.remove('sel'));
   if (tipSel === key) { tipSel = null; box.hidden = true; return; }
-  tipSel = key; st.classList.add('sel');
-  box.innerHTML = TIPS[key]; box.hidden = false;
+  tipSel = key;
+  if (t.classList.contains('stat')) t.classList.add('sel');
+  const anchor = t.classList.contains('stat') ? t.parentElement : t;
+  anchor.insertAdjacentElement('afterend', box);
+  box.innerHTML = TIPS[key] || ''; box.hidden = false;
 });
 
 /* ---- wiring ---- */
@@ -472,5 +484,28 @@ if (qp.get('lat') && qp.get('lon')) {
   setLoc(parseFloat(qp.get('lat')), parseFloat(qp.get('lon')), qp.get('name') || 'URL location');
   start(true);
 }
+
+/* ---- self-update: Home-Screen copies don't refresh on their own ---- */
+let updating = false;
+async function checkUpdate() {
+  if (updating) return;
+  try {
+    const r = await fetch('version.json?ts=' + Math.floor(Date.now() / 60000), { cache: 'no-store' });
+    if (!r.ok) return;
+    const j = await r.json();
+    if (j.v && j.v > APP_VERSION) {
+      updating = true;
+      const bar = document.createElement('div');
+      bar.id = 'updBar';
+      bar.textContent = '✨ Updating to v' + j.v + '…';
+      document.body.appendChild(bar);
+      setTimeout(() => location.reload(), 1200);
+    }
+  } catch (e) {}
+}
+document.addEventListener('visibilitychange', () => { if (!document.hidden) checkUpdate(); });
+setInterval(checkUpdate, 600000);
+checkUpdate();
+
 requestAnimationFrame(loop);
 }
