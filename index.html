@@ -21,7 +21,7 @@ html,body{margin:0;padding:0;background:var(--bg);color:var(--fg);
   font:15px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
   padding-bottom:env(safe-area-inset-bottom)}
 body.red{filter:sepia(1) hue-rotate(312deg) saturate(5) brightness(.55)}
-.wrap{max-width:520px;margin:0 auto;padding:10px 12px 28px}
+.wrap{max-width:520px;margin:0 auto;padding:calc(10px + env(safe-area-inset-top)) 12px 28px}
 header{display:flex;align-items:center;justify-content:space-between;padding:8px 2px 4px}
 header h1{font-size:19px;margin:0;letter-spacing:.5px}
 header h1 span{color:var(--acc)}
@@ -142,6 +142,6 @@ input.decl{width:52px;background:var(--card2);border:1px solid var(--line);color
       A 5–10 s night-mode photo sees more than your eyes.</div>
   </div>
 </div>
-<script src="app.js"></script>
+<script src="app.js?v=101"></script>
 </body>
 </html>

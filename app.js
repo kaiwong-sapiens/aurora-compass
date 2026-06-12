@@ -249,9 +249,13 @@ function start(fromPreset) {
 /* ---- rendering ---- */
 function fitCanvas(cv) {
   const dpr = window.devicePixelRatio || 1;
+  // Remember the DESIGN height once — cv.height assignment rewrites the height
+  // attribute, so re-reading it each frame compounds by dpr and blows up the canvas.
+  if (!cv.dataset.h) cv.dataset.h = cv.getAttribute('height') || 200;
   const w = cv.clientWidth || cv.parentElement.clientWidth - 28;
-  const h = parseInt(cv.getAttribute('height')) || 200;
-  cv.width = w * dpr; cv.height = h * dpr;
+  const h = parseInt(cv.dataset.h);
+  const W = Math.round(w * dpr), H = Math.round(h * dpr);
+  if (cv.width !== W || cv.height !== H) { cv.width = W; cv.height = H; }
   const ctx = cv.getContext('2d');
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   return { ctx, w, h };
