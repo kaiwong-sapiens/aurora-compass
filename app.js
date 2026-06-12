@@ -131,7 +131,11 @@ if (typeof module !== 'undefined') {
 /* ---------------- DOM app ---------------- */
 if (typeof window !== 'undefined' && typeof document !== 'undefined') {
 
-const APP_VERSION = 107;
+const APP_VERSION = 108;
+
+if ('serviceWorker' in navigator) {
+  try { navigator.serviceWorker.register('sw.js'); } catch (e) {}
+}
 
 const URLS = {
   kp: 'https://services.swpc.noaa.gov/json/planetary_k_index_1m.json',
@@ -149,7 +153,8 @@ const S = { loc: null, head: null, pitch: null, decl: 0,
 const $ = id => document.getElementById(id);
 
 async function jget(u) {
-  const r = await fetch(u, { cache: 'no-store' });
+  const sig = (typeof AbortSignal !== 'undefined' && AbortSignal.timeout) ? AbortSignal.timeout(15000) : undefined;
+  const r = await fetch(u, { cache: 'no-store', signal: sig });
   if (!r.ok) throw new Error(u + ' ' + r.status);
   S.lastOk = Date.now();
   return r.json();
@@ -301,6 +306,7 @@ function start(fromPreset) {
   $('overlay').style.display = 'none';
   if (!S.started) {
     S.started = true;
+    S.startedAt = Date.now();
     loadCache();
     updKp(); updWind(); updOvation(); updForecast();
     setInterval(updKp, 60000); setInterval(updWind, 60000);
@@ -500,7 +506,8 @@ function tick(t) {
   const v = makeVerdict(S.aur, S.sun, cloudNow(), S.bz);
   $('verdict').textContent = v.label; $('verdict').className = v.cls; $('vnote').textContent = v.note;
   const offBar = $('offBar');
-  const offline = S.started && (!S.lastOk || Date.now() - S.lastOk > 180000);
+  const offline = S.started && S.startedAt && Date.now() - S.startedAt > 10000 &&
+    (!S.lastOk || Date.now() - S.lastOk > 180000);
   offBar.hidden = !offline;
   if (offline) {
     const ref = S.lastOk || S.cacheAt;
