@@ -131,7 +131,7 @@ if (typeof module !== 'undefined') {
 /* ---------------- DOM app ---------------- */
 if (typeof window !== 'undefined' && typeof document !== 'undefined') {
 
-const APP_VERSION = 105;
+const APP_VERSION = 106;
 
 const URLS = {
   kp: 'https://services.swpc.noaa.gov/json/planetary_k_index_1m.json',
@@ -397,16 +397,22 @@ function drawClouds() {
     const tstr = S.clouds.time[S.cloudIdx + i];
     if (tstr) ctx.fillText(tstr.slice(11, 13) + 'h', x0 + i * bw + bw / 2, h - 6);
   }
-  let note = 'No solid clear break in the next 12 h.';
+  let bestDark = null, avgDark = 101, bestAny = null, avgAny = 101;
   for (let i = 0; i < N - 1; i++) {
-    const a = S.clouds.cloud_cover[S.cloudIdx + i], b = S.clouds.cloud_cover[S.cloudIdx + i + 1];
-    if (a != null && b != null && a < 40 && b < 40) {
-      note = 'Clearest from ~' + S.clouds.time[S.cloudIdx + i].slice(11, 16) + ' local (' +
-        a + '% cover). Darker = cloudier.';
-      break;
-    }
+    const idx = S.cloudIdx + i;
+    const t = S.clouds.time[idx];
+    const a = S.clouds.cloud_cover[idx], b = S.clouds.cloud_cover[idx + 1];
+    if (!t || a == null || b == null) break;
+    const avg = (a + b) / 2;
+    if (avg < avgAny) { avgAny = avg; bestAny = t; }
+    const hr = parseInt(t.slice(11, 13), 10);
+    if ((hr >= 22 || hr <= 4) && avg < avgDark) { avgDark = avg; bestDark = t; }
   }
-  $('cloudNote').textContent = note;
+  let note;
+  if (bestDark) note = 'Clearest DARK-hours window ~' + bestDark.slice(11, 16) + ' (' + Math.round(avgDark) + '% cover)';
+  else if (bestAny) note = 'Clearest ~' + bestAny.slice(11, 16) + ' (' + Math.round(avgAny) + '% cover) — daylight; dark hours not in view yet';
+  else note = 'No cloud data';
+  $('cloudNote').textContent = note + ' · pale = cloud, dark = clear';
 }
 
 function tick(t) {
@@ -460,7 +466,7 @@ const TIPS = {
   engine: '<b>Engine = is energy flowing in right now?</b> Combines Bz direction with wind speed: <b>surging</b> (Bz ≤ −5 — get outside soon), <b>favourable</b> (Bz south — door ajar), <b>idle</b> (Bz north — door shut). The minutes are the L1 lead: how long until what DSCOVR sees now reaches Earth.',
   compass: '<b>How to use:</b> the dial turns with your phone — red N is true north, the <b>green arc is where the aurora band sits</b>. “Rotate” says how far to turn (✓ when you\'re facing it), “tilt” is how high above the horizon to look (0° = flat horizon), “band edge” is the ground distance to where the glow starts.',
   sky: '<b>OVATION</b> is NOAA\'s live model of the auroral oval, updated every few minutes from the solar wind measured ~40 min upstream. The green band is where the glow should sit in <b>your</b> sky; the crosshair is where your phone points. The shimmer is simulated — brightness scales with the model\'s intensity.',
-  clouds: '<b>Low / Mid / High = three cloud layers</b> for your exact spot, next 12 h — darker cell = more cloud. Low cloud kills the show; thin high cirrus often doesn\'t (bright aurora shines through). The note below picks tonight\'s clearest window.',
+  clouds: '<b>Low / Mid / High = three cloud layers</b> for your exact spot, next 12 h. Cells are drawn like clouds against a night sky: <b>pale/bright = cloud, dark = clear</b>. Low cloud kills the show; thin high cirrus often doesn\'t (bright aurora shines through). The note picks the clearest window in the DARK hours (22:00–04:00) — the only ones that matter for aurora.',
   outlook: '<b>NOAA\'s 3-day forecast — max Kp per UTC day.</b> A UTC day starts at 18:00 MDT the evening before, so a date here mostly covers THAT night\'s dark hours. ≥4 reaches Jasper\'s sky; ≥5 is a storm, visible much farther south.',
   terms: '<b>Geomagnetic lat</b> — your latitude measured from the magnetic pole, the one aurora cares about (Jasper: 53° geographic ≈ 59° magnetic — why it\'s great aurora country). <b>Sun</b> — degrees below the horizon; you want ≤ −6°, and June here bottoms out ~−13°. <b>Compass correction</b> — phones point at magnetic north; true north differs by ~+13°E in the Rockies. Auto-set; edit if you know better.',
   dscovr: '<b>Data freshness line.</b> When the numbers above were measured at the DSCOVR satellite (shown in your local time, with age), and when that same parcel of wind reaches Earth — measured time + L1 lead. It updates every minute; if it falls more than ~10 min behind, the feed has a gap (⚠️ appears) — tap ↻ and trust your eyes meanwhile. See the “L1 lead ⓘ” tile for what DSCOVR is.'
