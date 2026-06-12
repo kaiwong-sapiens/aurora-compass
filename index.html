@@ -48,6 +48,8 @@ header h1 span{color:var(--acc)}
 #updBar{position:fixed;left:12px;right:12px;bottom:calc(12px + env(safe-area-inset-bottom));
   background:var(--acc);color:#04130a;border-radius:12px;padding:11px 14px;text-align:center;
   font-weight:700;font-size:14px;z-index:60;box-shadow:0 4px 18px rgba(0,0,0,.5)}
+#offBar{margin-top:10px;background:#2a2010;border:1px solid #6b5316;color:var(--warn);
+  border-radius:10px;padding:8px 11px;font-size:12.5px;line-height:1.45}
 #engine{margin-top:8px;font-size:13px;color:var(--dim)}
 #engine b{color:var(--fg)}
 canvas{display:block;width:100%}
@@ -100,6 +102,7 @@ input.decl{width:52px;background:var(--card2);border:1px solid var(--line);color
     </div>
   </header>
 
+  <div id="offBar" hidden></div>
   <div class="card">
     <div id="verdict" class="dim">Starting…</div>
     <div id="vnote">Waiting for live data.</div>
@@ -151,6 +154,6 @@ input.decl{width:52px;background:var(--card2);border:1px solid var(--line);color
       A 5–10 s night-mode photo sees more than your eyes.</div>
   </div>
 </div>
-<script src="app.js?v=106"></script>
+<script src="app.js?v=107"></script>
 </body>
 </html>

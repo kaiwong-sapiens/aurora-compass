@@ -131,7 +131,7 @@ if (typeof module !== 'undefined') {
 /* ---------------- DOM app ---------------- */
 if (typeof window !== 'undefined' && typeof document !== 'undefined') {
 
-const APP_VERSION = 106;
+const APP_VERSION = 107;
 
 const URLS = {
   kp: 'https://services.swpc.noaa.gov/json/planetary_k_index_1m.json',
@@ -143,14 +143,60 @@ const URLS = {
 
 const S = { loc: null, head: null, pitch: null, decl: 0,
             kp: null, bz: null, speed: null, ov: null, aur: null,
-            clouds: null, cloudIdx: -1, cloudOffset: 0, sun: null, started: false };
+            clouds: null, cloudIdx: -1, cloudOffset: 0, sun: null, started: false,
+            lastOk: null, cacheAt: null };
 
 const $ = id => document.getElementById(id);
 
 async function jget(u) {
   const r = await fetch(u, { cache: 'no-store' });
   if (!r.ok) throw new Error(u + ' ' + r.status);
+  S.lastOk = Date.now();
   return r.json();
+}
+
+/* ---- offline cache: keep the last good data across signal loss & relaunch ---- */
+function packCols(cols) {
+  let s = '';
+  for (let lo = 0; lo < 360; lo++)
+    for (let la = 30; la <= 90; la++) s += String.fromCharCode(cols[lo][la]);
+  return btoa(s);
+}
+function unpackCols(b64) {
+  const s = atob(b64), cols = [];
+  for (let i = 0; i < 360; i++) cols.push(new Uint8Array(91));
+  let k = 0;
+  for (let lo = 0; lo < 360; lo++)
+    for (let la = 30; la <= 90; la++) cols[lo][la] = s.charCodeAt(k++);
+  return cols;
+}
+function saveCache() {
+  try {
+    const o = { savedAt: Date.now(), kp: S.kp, bz: S.bz, speed: S.speed, loc: S.loc,
+      clouds: S.clouds, cloudOffset: S.cloudOffset,
+      stampSw: $('stampSw').textContent, fcHtml: $('fcTable').innerHTML };
+    if (S.ov) o.ov = { obs: S.ov.obs, fc: S.ov.fc, packed: packCols(S.ov.cols) };
+    localStorage.setItem('ac1', JSON.stringify(o));
+  } catch (e) {}
+}
+function loadCache() {
+  try {
+    const o = JSON.parse(localStorage.getItem('ac1') || 'null');
+    if (!o) return;
+    S.cacheAt = o.savedAt;
+    if (S.kp == null && o.kp != null) S.kp = o.kp;
+    if (S.bz == null && o.bz != null) S.bz = o.bz;
+    if (S.speed == null && o.speed != null) S.speed = o.speed;
+    if (!S.ov && o.ov && o.ov.packed) S.ov = { obs: o.ov.obs, fc: o.ov.fc, cols: unpackCols(o.ov.packed) };
+    if (!S.clouds && o.clouds) {
+      S.clouds = o.clouds; S.cloudOffset = o.cloudOffset || 0;
+      const nowLocal = new Date(Date.now() + S.cloudOffset * 1000).toISOString().slice(0, 13);
+      S.cloudIdx = S.clouds.time.findIndex(t => t.slice(0, 13) === nowLocal);
+    }
+    if (o.stampSw && $('stampSw').textContent === '–') $('stampSw').textContent = o.stampSw;
+    if (o.fcHtml && $('fcTable').textContent.indexOf('loading') >= 0) $('fcTable').innerHTML = o.fcHtml;
+    if (!S.loc && o.loc) setLoc(o.loc.lat, o.loc.lon, (o.loc.name || 'last position') + ' · cached');
+  } catch (e) {}
 }
 
 /* ---- data feeds ---- */
@@ -158,6 +204,7 @@ async function updKp() {
   try {
     const j = await jget(URLS.kp);
     S.kp = j[j.length - 1].estimated_kp;
+    saveCache();
   } catch (e) {}
 }
 function fmtT(d) {
@@ -175,6 +222,7 @@ async function updWind() {
       let s = 'measured at DSCOVR ' + fmtT(t) + ' (' + (age <= 1 ? 'just now' : age + ' min ago') + ')';
       if (sp) s += ' · reaches Earth ~' + fmtT(new Date(t.getTime() + L1_KM / sp.v * 1000));
       $('stampSw').textContent = (age > 10 ? '⚠️ stale · ' : '') + s + ' ⓘ';
+      saveCache();
     }
   } catch (e) {}
 }
@@ -184,6 +232,7 @@ async function updOvation() {
     S.ov = parseOvation(j);
     const fc = S.ov.fc ? new Date(S.ov.fc) : null;
     $('stampOv').textContent = fc ? 'oval forecast valid for ~' + fmtT(fc) + ' your time' : '';
+    saveCache();
   } catch (e) {}
 }
 async function updClouds() {
@@ -197,6 +246,7 @@ async function updClouds() {
     S.cloudOffset = j.utc_offset_seconds || 0;
     const nowLocal = new Date(Date.now() + S.cloudOffset * 1000).toISOString().slice(0, 13);
     S.cloudIdx = S.clouds.time.findIndex(t => t.slice(0, 13) === nowLocal);
+    saveCache();
   } catch (e) {}
 }
 async function updForecast() {
@@ -251,12 +301,25 @@ function start(fromPreset) {
   $('overlay').style.display = 'none';
   if (!S.started) {
     S.started = true;
+    loadCache();
     updKp(); updWind(); updOvation(); updForecast();
     setInterval(updKp, 60000); setInterval(updWind, 60000);
     setInterval(updOvation, 300000); setInterval(updClouds, 1800000);
     setInterval(updForecast, 10800000);
   }
 }
+
+/* ---- screen wake lock, tied to Night mode (for the lakeside vigil) ---- */
+let wakeLock = null;
+async function setWake(on) {
+  try {
+    if (on && 'wakeLock' in navigator) wakeLock = await navigator.wakeLock.request('screen');
+    else if (wakeLock) { wakeLock.release(); wakeLock = null; }
+  } catch (e) {}
+}
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden && document.body.classList.contains('red')) setWake(true);
+});
 
 /* ---- rendering ---- */
 function fitCanvas(cv) {
@@ -436,6 +499,14 @@ function tick(t) {
   }
   const v = makeVerdict(S.aur, S.sun, cloudNow(), S.bz);
   $('verdict').textContent = v.label; $('verdict').className = v.cls; $('vnote').textContent = v.note;
+  const offBar = $('offBar');
+  const offline = S.started && (!S.lastOk || Date.now() - S.lastOk > 180000);
+  offBar.hidden = !offline;
+  if (offline) {
+    const ref = S.lastOk || S.cacheAt;
+    offBar.textContent = '📵 No data link — showing ' + (ref ? 'data from ' + fmtT(new Date(ref)) : 'no data') +
+      '. Compass, sky position & tilt still work — they\'re computed on the phone. Your eyes are the live sensor now.';
+  }
   if (S.aur && (S.aur.status === 'north')) {
     if (S.head != null) {
       const diff = ((S.aur.az - S.head + 540) % 360) - 180;
@@ -492,7 +563,10 @@ document.querySelectorAll('.preset').forEach(b => b.addEventListener('click', ()
   setLoc(parseFloat(b.dataset.lat), parseFloat(b.dataset.lon), b.dataset.name);
   start(true);
 }));
-$('btnRed').addEventListener('click', () => document.body.classList.toggle('red'));
+$('btnRed').addEventListener('click', () => {
+  const on = document.body.classList.toggle('red');
+  setWake(on);
+});
 $('btnRefresh').addEventListener('click', () => { updKp(); updWind(); updOvation(); updClouds(); updForecast(); });
 $('vDecl').addEventListener('change', e => { S.decl = parseFloat(e.target.value) || 0; });
 
