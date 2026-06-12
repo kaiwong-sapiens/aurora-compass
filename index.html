@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="format-detection" content="telephone=no,date=no,address=no,email=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#05080f">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<title>Aurora Compass</title>
+<style>
+:root{
+  --bg:#05080f; --card:#0c1322; --card2:#0a101c; --line:#1b2840;
+  --fg:#dce7f5; --dim:#7f93b3; --acc:#59ffa0; --warn:#ffb454; --bad:#ff6b6b;
+}
+*{box-sizing:border-box; -webkit-tap-highlight-color:transparent}
+html,body{margin:0;padding:0;background:var(--bg);color:var(--fg);
+  font:15px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+  padding-bottom:env(safe-area-inset-bottom)}
+body.red{filter:sepia(1) hue-rotate(312deg) saturate(5) brightness(.55)}
+.wrap{max-width:520px;margin:0 auto;padding:10px 12px 28px}
+header{display:flex;align-items:center;justify-content:space-between;padding:8px 2px 4px}
+header h1{font-size:19px;margin:0;letter-spacing:.5px}
+header h1 span{color:var(--acc)}
+.hbtns{display:flex;gap:8px}
+.hbtn{background:var(--card);border:1px solid var(--line);color:var(--dim);
+  border-radius:9px;padding:6px 10px;font-size:12px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;
+  padding:12px 14px;margin-top:10px}
+.card h2{font-size:11px;letter-spacing:1.4px;text-transform:uppercase;color:var(--dim);margin:0 0 8px}
+#verdict{font-size:24px;font-weight:700;margin:2px 0 4px}
+#verdict.go{color:var(--acc)} #verdict.mid{color:var(--warn)}
+#verdict.dim{color:var(--dim)} #verdict.bad{color:var(--bad)}
+#vnote{color:var(--dim);font-size:13px}
+.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:10px}
+.stat{background:var(--card2);border-radius:10px;padding:8px 6px;text-align:center}
+.stat b{display:block;font-size:17px;font-weight:650}
+.stat span{font-size:10px;color:var(--dim);letter-spacing:.6px;text-transform:uppercase}
+.stat b.good{color:var(--acc)} .stat b.warn{color:var(--warn)} .stat b.bad{color:var(--bad)}
+#engine{margin-top:8px;font-size:13px;color:var(--dim)}
+#engine b{color:var(--fg)}
+canvas{display:block;width:100%}
+#cvCompass{max-width:280px;margin:4px auto}
+.point{display:flex;justify-content:space-between;gap:10px;margin-top:8px}
+.pbox{flex:1;background:var(--card2);border-radius:10px;padding:8px 10px;text-align:center}
+.pbox .big{font-size:17px;font-weight:650}
+.pbox .sub{font-size:11px;color:var(--dim)}
+#cloudNote{font-size:13px;color:var(--dim);margin-top:6px}
+table{width:100%;border-collapse:collapse;font-size:13px}
+td,th{padding:4px 2px;text-align:left;color:var(--dim);font-weight:400}
+td.k{font-weight:650;color:var(--fg)}
+.foot{margin-top:14px;font-size:11px;color:var(--dim);line-height:1.7}
+.foot a{color:var(--dim)}
+#overlay{position:fixed;inset:0;background:rgba(3,6,12,.93);display:flex;flex-direction:column;
+  align-items:center;justify-content:center;z-index:50;padding:24px;text-align:center}
+#overlay h1{color:var(--acc);font-size:26px;margin:0 0 6px}
+#overlay p{color:var(--dim);max-width:330px;font-size:14px}
+#btnStart{background:var(--acc);color:#04130a;border:0;border-radius:14px;
+  padding:14px 38px;font-size:18px;font-weight:700;margin-top:14px}
+.presets{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-top:18px}
+.preset{background:var(--card);border:1px solid var(--line);color:var(--dim);
+  border-radius:9px;padding:7px 12px;font-size:13px}
+.stamp{font-size:10px;color:#54648a;margin-top:6px}
+input.decl{width:52px;background:var(--card2);border:1px solid var(--line);color:var(--fg);
+  border-radius:6px;padding:2px 4px;font-size:12px;text-align:center}
+</style>
+</head>
+<body>
+<div id="overlay">
+  <h1>🌌 Aurora Compass</h1>
+  <p>Live aurora finder — points you at the glow using NOAA real-time space weather, your location and your phone's compass.</p>
+  <p style="font-size:12px">Location & motion stay on your phone. Two permission pop-ups will appear — tap Allow for both.</p>
+  <button id="btnStart">Start</button>
+  <div class="presets">
+    <button class="preset" data-lat="52.934" data-lon="-118.094" data-name="Pyramid Lake, Jasper">Pyramid Lake</button>
+    <button class="preset" data-lat="52.874" data-lon="-118.081" data-name="Jasper townsite">Jasper</button>
+    <button class="preset" data-lat="51.045" data-lon="-114.072" data-name="Calgary">Calgary</button>
+    <button class="preset" data-lat="51.507" data-lon="-0.128" data-name="London UK">London</button>
+  </div>
+  <p style="font-size:11px;margin-top:16px">Presets skip GPS (compass still asks). Best after midnight, away from town lights.</p>
+</div>
+
+<div class="wrap">
+  <header>
+    <h1>🌌 Aurora <span>Compass</span></h1>
+    <div class="hbtns">
+      <button class="hbtn" id="btnRed">Night</button>
+      <button class="hbtn" id="btnRefresh">↻</button>
+    </div>
+  </header>
+
+  <div class="card">
+    <div id="verdict" class="dim">Starting…</div>
+    <div id="vnote">Waiting for live data.</div>
+    <div class="grid">
+      <div class="stat"><b id="vKp">–</b><span>Kp now</span></div>
+      <div class="stat"><b id="vBz">–</b><span>Bz nT</span></div>
+      <div class="stat"><b id="vWind">–</b><span>wind km/s</span></div>
+      <div class="stat"><b id="vEta">–</b><span>L1 lead</span></div>
+    </div>
+    <div id="engine">Engine: <b>–</b></div>
+    <div class="stamp" id="stampSw">–</div>
+  </div>
+
+  <div class="card">
+    <h2>Find it — compass</h2>
+    <canvas id="cvCompass" width="280" height="280"></canvas>
+    <div class="point">
+      <div class="pbox"><div class="big" id="turnTxt">–</div><div class="sub">rotate</div></div>
+      <div class="pbox"><div class="big" id="elevTxt">–</div><div class="sub">tilt</div></div>
+      <div class="pbox"><div class="big" id="distTxt">–</div><div class="sub">band edge</div></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Sky view — where the glow should sit</h2>
+    <canvas id="cvDome" height="210"></canvas>
+    <div class="stamp" id="stampOv">–</div>
+  </div>
+
+  <div class="card">
+    <h2>Clouds next hours</h2>
+    <canvas id="cvClouds" height="130"></canvas>
+    <div id="cloudNote">–</div>
+  </div>
+
+  <div class="card">
+    <h2>Kp outlook (NOAA, UTC days)</h2>
+    <table id="fcTable"><tr><td>loading…</td></tr></table>
+  </div>
+
+  <div class="foot">
+    <div id="vPlace">📍 –</div>
+    <div>Geomagnetic lat <span id="vGm">–</span> · Sun <span id="vSun">–</span> ·
+      Compass correction <input class="decl" id="vDecl" type="number" step="1" value="0">° E</div>
+    <div>Live: NOAA SWPC (OVATION oval · 1-min Kp · DSCOVR solar wind) + Open-Meteo clouds.
+      Refreshes itself; ↻ forces. Your location never leaves the phone.</div>
+    <div>June at 53°N never gets fully dark — expect a low green band, not curtains.
+      A 5–10 s night-mode photo sees more than your eyes.</div>
+  </div>
+</div>
+<script src="app.js"></script>
+</body>
+</html>

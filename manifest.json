@@ -1,0 +1,12 @@
+{
+  "name": "Aurora Compass",
+  "short_name": "Aurora",
+  "description": "Live aurora finder — NOAA real-time space weather + compass pointing",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#05080f",
+  "theme_color": "#05080f",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}
