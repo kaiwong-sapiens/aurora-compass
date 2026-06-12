@@ -131,7 +131,7 @@ if (typeof module !== 'undefined') {
 /* ---------------- DOM app ---------------- */
 if (typeof window !== 'undefined' && typeof document !== 'undefined') {
 
-const APP_VERSION = 104;
+const APP_VERSION = 105;
 
 const URLS = {
   kp: 'https://services.swpc.noaa.gov/json/planetary_k_index_1m.json',
@@ -160,20 +160,30 @@ async function updKp() {
     S.kp = j[j.length - 1].estimated_kp;
   } catch (e) {}
 }
+function fmtT(d) {
+  return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
+}
 async function updWind() {
   try {
     const [mag, pla] = await Promise.all([jget(URLS.mag), jget(URLS.plasma)]);
     const bz = lastValid(mag, 3), sp = lastValid(pla, 2);
     if (bz) S.bz = bz.v;
     if (sp) S.speed = sp.v;
-    if (bz) $('stampSw').textContent = 'solar wind ' + bz.t.slice(11, 16) + ' UTC · DSCOVR @ L1 ⓘ';
+    if (bz) {
+      const t = new Date(bz.t.replace(' ', 'T') + 'Z');
+      const age = Math.max(0, Math.round((Date.now() - t.getTime()) / 60000));
+      let s = 'measured at DSCOVR ' + fmtT(t) + ' (' + (age <= 1 ? 'just now' : age + ' min ago') + ')';
+      if (sp) s += ' · reaches Earth ~' + fmtT(new Date(t.getTime() + L1_KM / sp.v * 1000));
+      $('stampSw').textContent = (age > 10 ? '⚠️ stale · ' : '') + s + ' ⓘ';
+    }
   } catch (e) {}
 }
 async function updOvation() {
   try {
     const j = await jget(URLS.ovation);
     S.ov = parseOvation(j);
-    $('stampOv').textContent = 'OVATION oval forecast for ' + (S.ov.fc || '').replace('T', ' ').replace('Z', ' UTC');
+    const fc = S.ov.fc ? new Date(S.ov.fc) : null;
+    $('stampOv').textContent = fc ? 'oval forecast valid for ~' + fmtT(fc) + ' your time' : '';
   } catch (e) {}
 }
 async function updClouds() {
@@ -446,14 +456,14 @@ const TIPS = {
   kp: '<b>Kp — global aurora activity, 0–9.</b> How disturbed Earth\'s magnetic field is (1-minute estimate here). From Jasper\'s latitude the band usually reaches your sky at <b>Kp ≈ 4</b>; Kp 5+ is storm level and can put it overhead. Kp looks BACK (3-h average) — for what\'s coming, watch Bz.',
   bz: '<b>Bz — the door. North–south tilt of the solar wind\'s magnetic field, in nanotesla.</b> Earth\'s field points north, so a SOUTH (negative) Bz lets the fields reconnect and aurora energy pour in. <b>≤ −5 = good zone (green)</b>; below −10 for an hour = storm. Positive/north = door shut, even in fast wind.',
   wind: '<b>Solar-wind speed at DSCOVR.</b> Calm sun ~350–400 km/s. 500–700+ km/s (high-speed stream or CME) makes any south-Bz hit much harder — speed × south-field = power.',
-  eta: '<b>L1 lead — your early warning.</b> DSCOVR floats 1.5 M km sunward, so what it measures now arrives at Earth in about this many minutes. If Bz dives south, you have roughly this long to get outside before the sky responds.',
+  eta: '<b>L1 lead — your early warning, courtesy of DSCOVR.</b> DSCOVR is NOAA\'s space-weather buoy, parked 1.5 million km sunward at L1 — the spot where Sun and Earth gravity balance, so everything the Sun throws at us blows past it FIRST. It radios back the wind\'s speed and Bz in real time; the wind then needs this many minutes to cover the last stretch to Earth. If Bz dives south, this is how long you have to get outside before the sky responds. (Bonus: DSCOVR also takes the full-disc “whole Earth” photos.)',
   engine: '<b>Engine = is energy flowing in right now?</b> Combines Bz direction with wind speed: <b>surging</b> (Bz ≤ −5 — get outside soon), <b>favourable</b> (Bz south — door ajar), <b>idle</b> (Bz north — door shut). The minutes are the L1 lead: how long until what DSCOVR sees now reaches Earth.',
   compass: '<b>How to use:</b> the dial turns with your phone — red N is true north, the <b>green arc is where the aurora band sits</b>. “Rotate” says how far to turn (✓ when you\'re facing it), “tilt” is how high above the horizon to look (0° = flat horizon), “band edge” is the ground distance to where the glow starts.',
   sky: '<b>OVATION</b> is NOAA\'s live model of the auroral oval, updated every few minutes from the solar wind measured ~40 min upstream. The green band is where the glow should sit in <b>your</b> sky; the crosshair is where your phone points. The shimmer is simulated — brightness scales with the model\'s intensity.',
   clouds: '<b>Low / Mid / High = three cloud layers</b> for your exact spot, next 12 h — darker cell = more cloud. Low cloud kills the show; thin high cirrus often doesn\'t (bright aurora shines through). The note below picks tonight\'s clearest window.',
   outlook: '<b>NOAA\'s 3-day forecast — max Kp per UTC day.</b> A UTC day starts at 18:00 MDT the evening before, so a date here mostly covers THAT night\'s dark hours. ≥4 reaches Jasper\'s sky; ≥5 is a storm, visible much farther south.',
   terms: '<b>Geomagnetic lat</b> — your latitude measured from the magnetic pole, the one aurora cares about (Jasper: 53° geographic ≈ 59° magnetic — why it\'s great aurora country). <b>Sun</b> — degrees below the horizon; you want ≤ −6°, and June here bottoms out ~−13°. <b>Compass correction</b> — phones point at magnetic north; true north differs by ~+13°E in the Rockies. Auto-set; edit if you know better.',
-  dscovr: '<b>DSCOVR — the planet\'s space-weather buoy.</b> A NOAA satellite parked 1.5 million km sunward at <b>L1</b>, the spot where Sun and Earth gravity balance — so everything the Sun throws at us blows past it FIRST. It radios back the solar wind\'s speed, density and Bz in real time; the wind then takes ~30–60 min to cover the last stretch, which is exactly your “L1 lead” early warning. (Bonus: it\'s also the satellite that takes the full-disc “whole Earth” photos.)'
+  dscovr: '<b>Data freshness line.</b> When the numbers above were measured at the DSCOVR satellite (shown in your local time, with age), and when that same parcel of wind reaches Earth — measured time + L1 lead. It updates every minute; if it falls more than ~10 min behind, the feed has a gap (⚠️ appears) — tap ↻ and trust your eyes meanwhile. See the “L1 lead ⓘ” tile for what DSCOVR is.'
 };
 let tipSel = null;
 document.addEventListener('click', e => {
