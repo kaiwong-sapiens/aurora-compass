@@ -40,6 +40,11 @@ header h1 span{color:var(--acc)}
 .stat b{display:block;font-size:17px;font-weight:650}
 .stat span{font-size:10px;color:var(--dim);letter-spacing:.6px;text-transform:uppercase}
 .stat b.good{color:var(--acc)} .stat b.warn{color:var(--warn)} .stat b.bad{color:var(--bad)}
+#tipBox{margin-top:8px;background:var(--card2);border:1px solid var(--line);border-radius:10px;
+  padding:9px 11px;font-size:12.5px;color:var(--dim);line-height:1.5}
+#tipBox b{color:var(--fg)}
+.stat{cursor:pointer}
+.stat.sel{outline:1px solid var(--acc)}
 #engine{margin-top:8px;font-size:13px;color:var(--dim)}
 #engine b{color:var(--fg)}
 canvas{display:block;width:100%}
@@ -95,12 +100,13 @@ input.decl{width:52px;background:var(--card2);border:1px solid var(--line);color
   <div class="card">
     <div id="verdict" class="dim">Starting…</div>
     <div id="vnote">Waiting for live data.</div>
-    <div class="grid">
-      <div class="stat"><b id="vKp">–</b><span>Kp now</span></div>
-      <div class="stat"><b id="vBz">–</b><span>Bz nT</span></div>
-      <div class="stat"><b id="vWind">–</b><span>wind km/s</span></div>
-      <div class="stat"><b id="vEta">–</b><span>L1 lead</span></div>
+    <div class="grid" id="statGrid">
+      <div class="stat" data-tip="kp"><b id="vKp">–</b><span>Kp now ⓘ</span></div>
+      <div class="stat" data-tip="bz"><b id="vBz">–</b><span>Bz nT ⓘ</span></div>
+      <div class="stat" data-tip="wind"><b id="vWind">–</b><span>wind km/s ⓘ</span></div>
+      <div class="stat" data-tip="eta"><b id="vEta">–</b><span>L1 lead ⓘ</span></div>
     </div>
+    <div id="tipBox" hidden></div>
     <div id="engine">Engine: <b>–</b></div>
     <div class="stamp" id="stampSw">–</div>
   </div>
@@ -142,6 +148,6 @@ input.decl{width:52px;background:var(--card2);border:1px solid var(--line);color
       A 5–10 s night-mode photo sees more than your eyes.</div>
   </div>
 </div>
-<script src="app.js?v=101"></script>
+<script src="app.js?v=102"></script>
 </body>
 </html>

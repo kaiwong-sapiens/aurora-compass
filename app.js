@@ -439,6 +439,24 @@ function loop(t) {
   requestAnimationFrame(loop);
 }
 
+/* ---- stat tooltips ---- */
+const TIPS = {
+  kp: '<b>Kp — global aurora activity, 0–9.</b> How disturbed Earth\'s magnetic field is (1-minute estimate here). From Jasper\'s latitude the band usually reaches your sky at <b>Kp ≈ 4</b>; Kp 5+ is storm level and can put it overhead. Kp looks BACK (3-h average) — for what\'s coming, watch Bz.',
+  bz: '<b>Bz — the door. North–south tilt of the solar wind\'s magnetic field, in nanotesla.</b> Earth\'s field points north, so a SOUTH (negative) Bz lets the fields reconnect and aurora energy pour in. <b>≤ −5 = good zone (green)</b>; below −10 for an hour = storm. Positive/north = door shut, even in fast wind.',
+  wind: '<b>Solar-wind speed at DSCOVR.</b> Calm sun ~350–400 km/s. 500–700+ km/s (high-speed stream or CME) makes any south-Bz hit much harder — speed × south-field = power.',
+  eta: '<b>L1 lead — your early warning.</b> DSCOVR floats 1.5 M km sunward, so what it measures now arrives at Earth in about this many minutes. If Bz dives south, you have roughly this long to get outside before the sky responds.'
+};
+let tipSel = null;
+$('statGrid').addEventListener('click', e => {
+  const st = e.target.closest('.stat');
+  if (!st) return;
+  const key = st.dataset.tip, box = $('tipBox');
+  document.querySelectorAll('.stat').forEach(s => s.classList.remove('sel'));
+  if (tipSel === key) { tipSel = null; box.hidden = true; return; }
+  tipSel = key; st.classList.add('sel');
+  box.innerHTML = TIPS[key]; box.hidden = false;
+});
+
 /* ---- wiring ---- */
 $('btnStart').addEventListener('click', () => start(false));
 document.querySelectorAll('.preset').forEach(b => b.addEventListener('click', () => {
