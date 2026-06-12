@@ -131,7 +131,7 @@ if (typeof module !== 'undefined') {
 /* ---------------- DOM app ---------------- */
 if (typeof window !== 'undefined' && typeof document !== 'undefined') {
 
-const APP_VERSION = 103;
+const APP_VERSION = 104;
 
 const URLS = {
   kp: 'https://services.swpc.noaa.gov/json/planetary_k_index_1m.json',
@@ -166,7 +166,7 @@ async function updWind() {
     const bz = lastValid(mag, 3), sp = lastValid(pla, 2);
     if (bz) S.bz = bz.v;
     if (sp) S.speed = sp.v;
-    if (bz) $('stampSw').textContent = 'solar wind ' + bz.t.slice(11, 16) + ' UTC · DSCOVR @ L1';
+    if (bz) $('stampSw').textContent = 'solar wind ' + bz.t.slice(11, 16) + ' UTC · DSCOVR @ L1 ⓘ';
   } catch (e) {}
 }
 async function updOvation() {
@@ -452,7 +452,8 @@ const TIPS = {
   sky: '<b>OVATION</b> is NOAA\'s live model of the auroral oval, updated every few minutes from the solar wind measured ~40 min upstream. The green band is where the glow should sit in <b>your</b> sky; the crosshair is where your phone points. The shimmer is simulated — brightness scales with the model\'s intensity.',
   clouds: '<b>Low / Mid / High = three cloud layers</b> for your exact spot, next 12 h — darker cell = more cloud. Low cloud kills the show; thin high cirrus often doesn\'t (bright aurora shines through). The note below picks tonight\'s clearest window.',
   outlook: '<b>NOAA\'s 3-day forecast — max Kp per UTC day.</b> A UTC day starts at 18:00 MDT the evening before, so a date here mostly covers THAT night\'s dark hours. ≥4 reaches Jasper\'s sky; ≥5 is a storm, visible much farther south.',
-  terms: '<b>Geomagnetic lat</b> — your latitude measured from the magnetic pole, the one aurora cares about (Jasper: 53° geographic ≈ 59° magnetic — why it\'s great aurora country). <b>Sun</b> — degrees below the horizon; you want ≤ −6°, and June here bottoms out ~−13°. <b>Compass correction</b> — phones point at magnetic north; true north differs by ~+13°E in the Rockies. Auto-set; edit if you know better.'
+  terms: '<b>Geomagnetic lat</b> — your latitude measured from the magnetic pole, the one aurora cares about (Jasper: 53° geographic ≈ 59° magnetic — why it\'s great aurora country). <b>Sun</b> — degrees below the horizon; you want ≤ −6°, and June here bottoms out ~−13°. <b>Compass correction</b> — phones point at magnetic north; true north differs by ~+13°E in the Rockies. Auto-set; edit if you know better.',
+  dscovr: '<b>DSCOVR — the planet\'s space-weather buoy.</b> A NOAA satellite parked 1.5 million km sunward at <b>L1</b>, the spot where Sun and Earth gravity balance — so everything the Sun throws at us blows past it FIRST. It radios back the solar wind\'s speed, density and Bz in real time; the wind then takes ~30–60 min to cover the last stretch, which is exactly your “L1 lead” early warning. (Bonus: it\'s also the satellite that takes the full-disc “whole Earth” photos.)'
 };
 let tipSel = null;
 document.addEventListener('click', e => {
