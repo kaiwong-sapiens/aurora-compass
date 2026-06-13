@@ -10,7 +10,7 @@ A single-page web app that helps you **find the aurora in the sky** — like a s
 - **Where to look**: the current **OVATION aurora oval** (NOAA nowcast) is reduced to a bearing + elevation for *your* position. A **compass dial** (with calibration guidance) and a **sky-dome** view show the band; rotate/tilt/band-edge prompts guide your phone onto it.
 - **Clouds**: hourly low/mid/high cloud cover for your exact spot (Open-Meteo) with a "clearest dark-hours window" hint. Pale = cloud, dark = clear.
 - **3-hourly Kp forecast** in your local time, with a continuous **day→night background gradient** computed from the real sun position (the dark stretch is your viewing window), G1–G5 storm labels, and threshold lines at Kp 4 (reaches Jasper) and Kp 5 (storm).
-- **Verdict**: one line combining darkness (sun elevation), oval strength over your longitude, and cloud — GO / POSSIBLE OVERHEAD / MARGINAL / QUIET / TOO FAR NORTH / CLOUDED OUT / DAYLIGHT.
+- **Verdict**: one line combining darkness (sun elevation), oval strength over your longitude, and cloud — GO / POSSIBLE OVERHEAD / MARGINAL / FAINT / QUIET / TOO FAR NORTH / CLOUDED OUT / DAYLIGHT. The compass shows the band's direction whenever the oval is at all present (faint included).
 - **Tap-to-explain (ⓘ)** on every stat and panel.
 - **Night mode** (red) to protect dark adaptation — also holds the screen awake for the vigil.
 

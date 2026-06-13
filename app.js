@@ -74,7 +74,7 @@ function computeAurora(ov, lat, lon) {
   const m = analyzeLon(ov.cols, lon);
   const res = { peakVal: m.peakVal, boundaryLat: m.boundary, peakLat: m.peakLat,
                 status: 'quiet', az: 0, azW: -35, azE: 35, elevLow: 0, elevTop: 0, distKm: 0 };
-  if (m.peakVal < OVAL_THRESH) return res;  // below the visible band edge → treat as quiet (matches makeVerdict)
+  if (m.peakVal < 3) return res;  // nothing meaningful in the column → quiet, no band
   const bLat = m.boundary >= 0 ? m.boundary : m.peakLat;
   if (bLat <= lat + 1) {
     return Object.assign(res, { status: 'overhead', az: 0, elevLow: 50, elevTop: 88, distKm: 0 });
@@ -94,10 +94,11 @@ function computeAurora(ov, lat, lon) {
 }
 
 function makeVerdict(aur, sunEl, cloudNow, bz) {
-  if (sunEl != null && sunEl > -6) return { label: 'DAYLIGHT', cls: 'bad', note: 'Sky too bright — check back after dark (~23:00 local).' };
-  if (!aur || aur.peakVal < OVAL_THRESH) return { label: 'QUIET', cls: 'dim', note: 'Aurora oval is weak over your longitude right now.' };
+  if (sunEl != null && sunEl > -6) return { label: 'DAYLIGHT', cls: 'bad', note: 'Sky too bright — check back after dark.' };
+  if (!aur || aur.status === 'quiet') return { label: 'QUIET', cls: 'dim', note: 'Aurora oval is weak over your longitude right now.' };
   if (aur.status === 'below-horizon') return { label: 'TOO FAR NORTH', cls: 'dim', note: 'Band edge ~' + aur.distKm + ' km north — below your horizon. Needs a stronger push (higher Kp).' };
   if (cloudNow != null && cloudNow >= 75) return { label: 'CLOUDED OUT', cls: 'bad', note: 'Overcast at your spot — watch the cloud strip for a break.' };
+  if (aur.peakVal < OVAL_THRESH) return { label: 'FAINT', cls: 'mid', note: 'Sub-visible oval — a faint band may sit ' + (aur.status === 'overhead' ? 'overhead' : 'low to the north') + '; a long exposure catches it before your eyes. Direction on the compass below.' };
   const strong = aur.peakVal >= 30 || (bz != null && bz <= -5);
   if (aur.status === 'overhead') return strong
     ? { label: 'GO — LOOK UP', cls: 'go', note: 'The oval is over you. Get away from lights NOW.' }
@@ -123,7 +124,7 @@ if (typeof module !== 'undefined') {
 /* ---------------- DOM app ---------------- */
 if (typeof window !== 'undefined' && typeof document !== 'undefined') {
 
-const APP_VERSION = 115;
+const APP_VERSION = 116;
 
 if ('serviceWorker' in navigator) {
   try { navigator.serviceWorker.register('sw.js'); } catch (e) {}
@@ -366,12 +367,15 @@ function drawCompass() {
     let a1 = S.aur.azW, a2 = S.aur.azE;
     if (S.aur.status === 'overhead') { a1 = 0; a2 = 359.9; }
     if (norm360(a2 - a1) < 24) { const c = S.aur.az; a1 = c - 12; a2 = c + 12; }
-    const alpha = Math.min(0.9, 0.3 + S.aur.peakVal / 60);
+    const belowH = S.aur.status === 'below-horizon';
+    const alpha = belowH ? 0.28 : Math.min(0.9, 0.3 + S.aur.peakVal / 60);
     ctx.strokeStyle = 'rgba(89,255,160,' + alpha + ')';
-    ctx.lineWidth = 13; ctx.lineCap = 'round';
+    ctx.lineWidth = belowH ? 6 : 13; ctx.lineCap = 'round';
+    if (belowH) ctx.setLineDash([3, 7]);  // dim + dashed: direction of the oval, but below the horizon
     ctx.beginPath();
     ctx.arc(0, 0, r, toRad(a1 - 90), toRad((norm360(a2 - a1) ? a2 : a1 + 0.1) - 90), false);
     ctx.stroke();
+    ctx.setLineDash([]);
   }
   ctx.restore();
   ctx.fillStyle = '#59ffa0';
@@ -521,6 +525,12 @@ function tick(t) {
     $('distTxt').textContent = S.aur.distKm + ' km';
   } else if (S.aur && S.aur.status === 'overhead') {
     $('turnTxt').textContent = 'any'; $('elevTxt').textContent = 'look up'; $('distTxt').textContent = 'over you';
+  } else if (S.aur && S.aur.status === 'below-horizon') {
+    if (S.head != null) {
+      const diff = ((S.aur.az - S.head + 540) % 360) - 180;
+      $('turnTxt').textContent = (diff > 0 ? '→ ' : '← ') + Math.round(Math.abs(diff)) + '°';
+    } else $('turnTxt').textContent = 'az ' + Math.round(S.aur.az) + '°';
+    $('elevTxt').textContent = 'below'; $('distTxt').textContent = S.aur.distKm + ' km';
   } else {
     $('turnTxt').textContent = '–'; $('elevTxt').textContent = '–'; $('distTxt').textContent = '–';
   }
@@ -542,9 +552,9 @@ function drawKp() {
     ctx.fillText('Kp forecast loading…', 10, h / 2); return;
   }
   const nowMs = Date.now();
-  const up = S.fc.filter(r => r.t.getTime() > nowMs - 3 * 3600 * 1000).slice(0, 12);
+  const up = S.fc.filter(r => r.t.getTime() > nowMs - 3 * 3600 * 1000).slice(0, 24);  // full forecast horizon (~3 days)
   if (!up.length) return;
-  const x0 = 4, top = 12, yb = h - 24, N = up.length, bw = (w - x0 - 4) / N;
+  const x0 = 4, top = 12, yb = h - 24, N = up.length, bw = (w - x0 - 4) / N, lblStep = N > 16 ? 4 : 2;
   const yOf = kp => yb - Math.min(9, kp) / 9 * (yb - top);
   let darkPeak = null, anyPeak = null;
   // smooth day→night background painted from the sun's elevation at this spot/time
@@ -559,6 +569,12 @@ function drawKp() {
   }
   up.forEach((r, i) => {
     const x = x0 + i * bw, dark = sunAt(r.t.getTime() + 5400000) < -6;  // dark at bin midpoint
+    // day divider + weekday at each local-midnight boundary
+    if (i === 0 || r.t.toDateString() !== up[i - 1].t.toDateString()) {
+      if (i > 0) { ctx.strokeStyle = 'rgba(180,200,230,.25)'; ctx.lineWidth = 1; ctx.setLineDash([2, 3]); ctx.beginPath(); ctx.moveTo(x, top); ctx.lineTo(x, yb); ctx.stroke(); ctx.setLineDash([]); }
+      ctx.fillStyle = '#aebbd6'; ctx.font = '600 9px sans-serif'; ctx.textAlign = 'left';
+      ctx.fillText(r.t.toLocaleDateString([], { weekday: 'short' }), x + 2, 9);
+    }
     const y = yOf(r.kp);
     const col = r.kp >= 5 ? '#8affc0' : r.kp >= 4 ? '#59ffa0' : r.kp >= 3 ? '#ffb454' : '#9fb4d8';
     const bx = x + 1.5, bwid = Math.max(1, bw - 3), bh = yb - y;
@@ -569,7 +585,7 @@ function drawKp() {
     ctx.strokeStyle = 'rgba(2,6,12,.9)'; ctx.lineWidth = 1; ctx.strokeRect(bx + 0.5, y + 0.5, bwid - 1, bh - 0.5);
     ctx.globalAlpha = 1;
     if (r.g) { ctx.fillStyle = '#cfeede'; ctx.font = '8px sans-serif'; ctx.textAlign = 'center'; ctx.fillText(r.g, x + bw / 2, y - 2); }
-    if (i % 2 === 0) { ctx.fillStyle = '#c3cfe6'; ctx.font = '9px sans-serif'; ctx.textAlign = 'center'; ctx.fillText(fmtT(r.t), x + bw / 2, h - 9); }
+    if (i % lblStep === 0) { ctx.fillStyle = '#c3cfe6'; ctx.font = '9px sans-serif'; ctx.textAlign = 'center'; ctx.fillText(fmtT(r.t), x + bw / 2, h - 9); }
     if (!r.past) {
       if (!anyPeak || r.kp > anyPeak.kp) anyPeak = r;
       if (dark && (!darkPeak || r.kp > darkPeak.kp)) darkPeak = r;
@@ -585,11 +601,12 @@ function drawKp() {
     ctx.fillStyle = txt; ctx.font = '600 9.5px sans-serif'; ctx.textAlign = 'right'; ctx.fillText(lbl, w - 3, y - 3);
   });
   ctx.setLineDash([]);
+  const wd = d => d.toLocaleDateString([], { weekday: 'short' }) + ' ' + fmtT(d);
   let note = '';
-  if (darkPeak) note = '🌙 Dark-hours peak Kp ' + darkPeak.kp.toFixed(1) + ' at ' + fmtT(darkPeak.t) + (darkPeak.g ? ' (' + darkPeak.g + ')' : '');
+  if (darkPeak) note = '🌙 Best dark-hours Kp ' + darkPeak.kp.toFixed(1) + ' — ' + wd(darkPeak.t) + (darkPeak.g ? ' (' + darkPeak.g + ')' : '');
   if (anyPeak && sunAt(anyPeak.t.getTime() + 5400000) > -6 && (!darkPeak || anyPeak.kp > darkPeak.kp + 0.4))
-    note += (note ? ' · ' : '') + '⚠️ biggest spike Kp ' + anyPeak.kp.toFixed(1) + ' at ' + fmtT(anyPeak.t) + ' is in daylight';
-  $('kpNote').textContent = note || 'background = daylight (lighter) → night (darker) · faded bars = past';
+    note += (note ? ' · ' : '') + '⚠️ biggest spike Kp ' + anyPeak.kp.toFixed(1) + ' — ' + wd(anyPeak.t) + ' (daylight)';
+  $('kpNote').textContent = note || 'next ~3 days · daylight (lighter) → night (darker) · faded = past';
 }
 
 let last = 0;
