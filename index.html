@@ -143,8 +143,9 @@ input.decl{width:52px;background:var(--card2);border:1px solid var(--line);color
   </div>
 
   <div class="card">
-    <h2 data-tip="outlook">Kp outlook (NOAA, UTC days) ⓘ</h2>
-    <table id="fcTable"><tr><td>loading…</td></tr></table>
+    <h2 data-tip="outlook">Kp forecast — 3-hourly, your time ⓘ</h2>
+    <canvas id="cvKp" height="150"></canvas>
+    <div class="stamp" id="kpNote">loading…</div>
   </div>
 
   <div class="foot">
@@ -157,6 +158,6 @@ input.decl{width:52px;background:var(--card2);border:1px solid var(--line);color
       A 5–10 s night-mode photo sees more than your eyes.</div>
   </div>
 </div>
-<script src="app.js?v=109"></script>
+<script src="app.js?v=110"></script>
 </body>
 </html>

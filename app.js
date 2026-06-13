@@ -131,7 +131,7 @@ if (typeof module !== 'undefined') {
 /* ---------------- DOM app ---------------- */
 if (typeof window !== 'undefined' && typeof document !== 'undefined') {
 
-const APP_VERSION = 109;
+const APP_VERSION = 110;
 
 if ('serviceWorker' in navigator) {
   try { navigator.serviceWorker.register('sw.js'); } catch (e) {}
@@ -148,7 +148,7 @@ const URLS = {
 const S = { loc: null, head: null, pitch: null, decl: 0, usedWk: false, cAcc: null, hSmooth: null,
             kp: null, bz: null, speed: null, ov: null, aur: null,
             clouds: null, cloudIdx: -1, cloudOffset: 0, sun: null, started: false,
-            lastOk: null, cacheAt: null };
+            lastOk: null, cacheAt: null, fc: null };
 
 const $ = id => document.getElementById(id);
 
@@ -179,7 +179,8 @@ function saveCache() {
   try {
     const o = { savedAt: Date.now(), kp: S.kp, bz: S.bz, speed: S.speed, loc: S.loc,
       clouds: S.clouds, cloudOffset: S.cloudOffset,
-      stampSw: $('stampSw').textContent, fcHtml: $('fcTable').innerHTML };
+      stampSw: $('stampSw').textContent,
+      fc: (S.fc || []).map(r => ({ t: r.t.toISOString(), kp: r.kp, past: r.past, g: r.g })) };
     if (S.ov) o.ov = { obs: S.ov.obs, fc: S.ov.fc, packed: packCols(S.ov.cols) };
     localStorage.setItem('ac1', JSON.stringify(o));
   } catch (e) {}
@@ -199,7 +200,7 @@ function loadCache() {
       S.cloudIdx = S.clouds.time.findIndex(t => t.slice(0, 13) === nowLocal);
     }
     if (o.stampSw && $('stampSw').textContent === '–') $('stampSw').textContent = o.stampSw;
-    if (o.fcHtml && $('fcTable').textContent.indexOf('loading') >= 0) $('fcTable').innerHTML = o.fcHtml;
+    if (!S.fc && o.fc) S.fc = o.fc.map(r => ({ t: new Date(r.t), kp: r.kp, past: r.past, g: r.g }));
     if (!S.loc && o.loc) setLoc(o.loc.lat, o.loc.lon, (o.loc.name || 'last position') + ' · cached');
   } catch (e) {}
 }
@@ -257,17 +258,11 @@ async function updClouds() {
 async function updForecast() {
   try {
     const j = await jget(URLS.fc);
-    const days = {};
-    for (const row of j) {
-      if (row.observed === 'observed') continue;
-      const day = row.time_tag.slice(0, 10);
-      days[day] = Math.max(days[day] || 0, row.kp);
-    }
-    const keys = Object.keys(days).sort().slice(0, 3);
-    $('fcTable').innerHTML = keys.map(k =>
-      '<tr><td>' + k + '</td><td class="k">max Kp ' + days[k].toFixed(1) + '</td><td>' +
-      (days[k] >= 5 ? 'storm — visible far south' : days[k] >= 4 ? 'good for ~53°N+' : 'high-latitude only') +
-      '</td></tr>').join('');
+    S.fc = j.map(r => ({
+      t: new Date(r.time_tag.replace(' ', 'T') + 'Z'),
+      kp: r.kp, past: r.observed === 'observed', g: r.noaa_scale || null
+    }));
+    saveCache();
   } catch (e) {}
 }
 
@@ -543,7 +538,51 @@ function tick(t) {
     else if (S.cAcc != null && S.cAcc > 25) { cal.className = 'bad'; cal.textContent = '⚠️ Compass needs calibrating — wave the phone in a slow figure-8, and step away from the car / any magnetic case.'; }
     else { cal.className = 'ok'; cal.textContent = 'If north looks wrong: wave a figure-8 to calibrate, and keep clear of the car & magnetic/MagSafe cases.' + (S.cAcc != null && S.cAcc >= 0 ? ' (±' + Math.round(S.cAcc) + '°)' : ''); }
   }
-  drawCompass(); drawDome(t); drawClouds();
+  drawCompass(); drawDome(t); drawClouds(); drawKp();
+}
+
+function drawKp() {
+  const cv = $('cvKp'); if (!cv) return;
+  const { ctx, w, h } = fitCanvas(cv);
+  ctx.clearRect(0, 0, w, h);
+  if (!S.fc || !S.fc.length) {
+    ctx.fillStyle = '#54648a'; ctx.font = '12px -apple-system,sans-serif';
+    ctx.fillText('Kp forecast loading…', 10, h / 2); return;
+  }
+  const nowMs = Date.now();
+  const up = S.fc.filter(r => r.t.getTime() > nowMs - 3 * 3600 * 1000).slice(0, 12);
+  if (!up.length) return;
+  const x0 = 4, top = 12, yb = h - 24, N = up.length, bw = (w - x0 - 4) / N;
+  const yOf = kp => yb - Math.min(9, kp) / 9 * (yb - top);
+  ctx.setLineDash([3, 3]); ctx.lineWidth = 1;
+  [['Kp4', 4], ['Kp5', 5]].forEach(([lbl, k]) => {
+    const y = yOf(k); ctx.strokeStyle = '#243352';
+    ctx.beginPath(); ctx.moveTo(x0, y); ctx.lineTo(w - 2, y); ctx.stroke();
+    ctx.fillStyle = '#5b6f96'; ctx.font = '9px sans-serif'; ctx.textAlign = 'left'; ctx.fillText(lbl, x0 + 1, y - 2);
+  });
+  ctx.setLineDash([]);
+  let darkPeak = null, anyPeak = null;
+  up.forEach((r, i) => {
+    const hr = r.t.getHours(), night = (hr >= 21 || hr <= 4), x = x0 + i * bw;
+    if (night) { ctx.fillStyle = 'rgba(40,60,100,.30)'; ctx.fillRect(x, top, bw, yb - top); }
+    const y = yOf(r.kp);
+    const col = r.kp >= 5 ? '#8affc0' : r.kp >= 4 ? '#59ffa0' : r.kp >= 3 ? '#ffb454' : '#46506e';
+    ctx.globalAlpha = r.past ? 0.4 : 1;
+    ctx.fillStyle = col; ctx.fillRect(x + 1.5, y, Math.max(1, bw - 3), yb - y);
+    ctx.globalAlpha = 1;
+    if (r.g) { ctx.fillStyle = '#cfeede'; ctx.font = '8px sans-serif'; ctx.textAlign = 'center'; ctx.fillText(r.g, x + bw / 2, y - 2); }
+    if (i % 2 === 0) { ctx.fillStyle = '#7f93b3'; ctx.font = '9px sans-serif'; ctx.textAlign = 'center'; ctx.fillText(fmtT(r.t), x + bw / 2, h - 9); }
+    if (!r.past) {
+      if (!anyPeak || r.kp > anyPeak.kp) anyPeak = r;
+      if (night && (!darkPeak || r.kp > darkPeak.kp)) darkPeak = r;
+    }
+  });
+  ctx.strokeStyle = '#33415f'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(x0, yb); ctx.lineTo(w - 2, yb); ctx.stroke();
+  let note = '';
+  if (darkPeak) note = '🌙 Dark-hours peak Kp ' + darkPeak.kp.toFixed(1) + ' at ' + fmtT(darkPeak.t) + (darkPeak.g ? ' (' + darkPeak.g + ')' : '');
+  if (anyPeak && !(anyPeak.t.getHours() >= 21 || anyPeak.t.getHours() <= 4) && (!darkPeak || anyPeak.kp > darkPeak.kp + 0.4))
+    note += (note ? ' · ' : '') + '⚠️ biggest spike Kp ' + anyPeak.kp.toFixed(1) + ' at ' + fmtT(anyPeak.t) + ' is in daylight';
+  $('kpNote').textContent = note || 'shaded = your dark hours · faded = already past';
 }
 
 let last = 0;
@@ -562,7 +601,7 @@ const TIPS = {
   compass: '<b>How to use:</b> the dial turns with your phone — red N is true north, the <b>green arc is where the aurora band sits</b>. “Rotate” says how far to turn (✓ when you\'re facing it), “tilt” is how high above the horizon to look (0° = flat horizon), “band edge” is the ground distance to where the glow starts. <b>If north seems wrong:</b> the phone\'s magnetometer needs calibrating — wave the phone in a slow figure-8 a few times, and stand clear of the car and any magnetic / MagSafe case (both swing a phone compass hard).',
   sky: '<b>OVATION</b> is NOAA\'s live model of the auroral oval, updated every few minutes from the solar wind measured ~40 min upstream. The green band is where the glow should sit in <b>your</b> sky; the crosshair is where your phone points. The shimmer is simulated — brightness scales with the model\'s intensity.',
   clouds: '<b>Low / Mid / High = three cloud layers</b> for your exact spot, next 12 h. Cells are drawn like clouds against a night sky: <b>pale/bright = cloud, dark = clear</b>. Low cloud kills the show; thin high cirrus often doesn\'t (bright aurora shines through). The note picks the clearest window in the DARK hours (22:00–04:00) — the only ones that matter for aurora.',
-  outlook: '<b>NOAA\'s 3-day forecast — max Kp per UTC day.</b> A UTC day starts at 18:00 MDT the evening before, so a date here mostly covers THAT night\'s dark hours. ≥4 reaches Jasper\'s sky; ≥5 is a storm, visible much farther south.',
+  outlook: '<b>3-hourly Kp forecast (NOAA), in your local time</b> — Kp is defined in 3-hour blocks, so this is the finest a Kp forecast gets. <b>Shaded bars = your dark hours</b> (the only ones that count); faded = already past; G1–G5 marks storm bars. Dashed lines = Kp 4 (reaches Jasper) and Kp 5 (storm). Watch for a big spike landing in daylight — it\'s wasted. For finer-than-3h timing, use the live Bz / L1-lead up top.',
   terms: '<b>Geomagnetic lat</b> — your latitude measured from the magnetic pole, the one aurora cares about (Jasper: 53° geographic ≈ 59° magnetic — why it\'s great aurora country). <b>Sun</b> — degrees below the horizon; you want ≤ −6°, and June here bottoms out ~−13°. <b>Compass correction</b> — a manual nudge, normally leave at 0 (your iPhone already points to true north). If the dial reads consistently wrong by some fixed amount, dial it in here; but figure-8 calibration fixes most errors.',
   dscovr: '<b>Data freshness line.</b> When the numbers above were measured at the DSCOVR satellite (shown in your local time, with age), and when that same parcel of wind reaches Earth — measured time + L1 lead. It updates every minute; if it falls more than ~10 min behind, the feed has a gap (⚠️ appears) — tap ↻ and trust your eyes meanwhile. See the “L1 lead ⓘ” tile for what DSCOVR is.'
 };
