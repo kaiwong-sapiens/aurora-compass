@@ -131,7 +131,7 @@ if (typeof module !== 'undefined') {
 /* ---------------- DOM app ---------------- */
 if (typeof window !== 'undefined' && typeof document !== 'undefined') {
 
-const APP_VERSION = 108;
+const APP_VERSION = 109;
 
 if ('serviceWorker' in navigator) {
   try { navigator.serviceWorker.register('sw.js'); } catch (e) {}
@@ -145,7 +145,7 @@ const URLS = {
   fc: 'https://services.swpc.noaa.gov/products/noaa-planetary-k-index-forecast.json'
 };
 
-const S = { loc: null, head: null, pitch: null, decl: 0,
+const S = { loc: null, head: null, pitch: null, decl: 0, usedWk: false, cAcc: null, hSmooth: null,
             kp: null, bz: null, speed: null, ov: null, aur: null,
             clouds: null, cloudIdx: -1, cloudOffset: 0, sun: null, started: false,
             lastOk: null, cacheAt: null };
@@ -279,15 +279,26 @@ function cloudNow() {
 /* ---- sensors ---- */
 function armOrientation() {
   window.addEventListener('deviceorientation', e => {
-    if (e.webkitCompassHeading != null) S.head = e.webkitCompassHeading + S.decl;
-    else if (e.alpha != null && e.absolute) S.head = norm360(360 - e.alpha + S.decl);
+    let h = null;
+    if (e.webkitCompassHeading != null && !isNaN(e.webkitCompassHeading)) {
+      h = e.webkitCompassHeading;                 // iOS: already a true-north compass heading
+      S.usedWk = true;
+      if (e.webkitCompassAccuracy != null) S.cAcc = e.webkitCompassAccuracy;
+    } else if (!S.usedWk && e.alpha != null) {
+      h = norm360(360 - e.alpha);                 // Android/other fallback
+    }
+    if (h != null) {
+      h = norm360(h + S.decl);                     // decl = optional manual nudge (default 0)
+      // circular smoothing damps jitter and brief glitches without lagging real turns much
+      if (S.hSmooth == null) S.hSmooth = h;
+      else { const d = ((h - S.hSmooth + 540) % 360) - 180; S.hSmooth = norm360(S.hSmooth + d * 0.3); }
+      S.head = S.hSmooth;
+    }
     if (e.beta != null) S.pitch = e.beta - 90;  // portrait, screen toward you
   }, true);
 }
 function setLoc(lat, lon, name) {
   S.loc = { lat, lon, name: name || (lat.toFixed(2) + ', ' + lon.toFixed(2)) };
-  S.decl = declEstimate(lat, lon);
-  $('vDecl').value = S.decl;
   $('vPlace').textContent = '📍 ' + S.loc.name + ' (' + lat.toFixed(3) + ', ' + lon.toFixed(3) + ')';
   $('vGm').textContent = geomagLat(lat, lon).toFixed(0) + '°';
   updClouds();
@@ -526,6 +537,12 @@ function tick(t) {
   } else {
     $('turnTxt').textContent = '–'; $('elevTxt').textContent = '–'; $('distTxt').textContent = '–';
   }
+  const cal = $('calNote');
+  if (cal) {
+    if (S.head == null) { cal.className = 'warn'; cal.textContent = 'Compass off — tap Start and allow Motion access.'; }
+    else if (S.cAcc != null && S.cAcc > 25) { cal.className = 'bad'; cal.textContent = '⚠️ Compass needs calibrating — wave the phone in a slow figure-8, and step away from the car / any magnetic case.'; }
+    else { cal.className = 'ok'; cal.textContent = 'If north looks wrong: wave a figure-8 to calibrate, and keep clear of the car & magnetic/MagSafe cases.' + (S.cAcc != null && S.cAcc >= 0 ? ' (±' + Math.round(S.cAcc) + '°)' : ''); }
+  }
   drawCompass(); drawDome(t); drawClouds();
 }
 
@@ -542,11 +559,11 @@ const TIPS = {
   wind: '<b>Solar-wind speed at DSCOVR.</b> Calm sun ~350–400 km/s. 500–700+ km/s (high-speed stream or CME) makes any south-Bz hit much harder — speed × south-field = power.',
   eta: '<b>L1 lead — your early warning, courtesy of DSCOVR.</b> DSCOVR is NOAA\'s space-weather buoy, parked 1.5 million km sunward at L1 — the spot where Sun and Earth gravity balance, so everything the Sun throws at us blows past it FIRST. It radios back the wind\'s speed and Bz in real time; the wind then needs this many minutes to cover the last stretch to Earth. If Bz dives south, this is how long you have to get outside before the sky responds. (Bonus: DSCOVR also takes the full-disc “whole Earth” photos.)',
   engine: '<b>Engine = is energy flowing in right now?</b> Combines Bz direction with wind speed: <b>surging</b> (Bz ≤ −5 — get outside soon), <b>favourable</b> (Bz south — door ajar), <b>idle</b> (Bz north — door shut). The minutes are the L1 lead: how long until what DSCOVR sees now reaches Earth.',
-  compass: '<b>How to use:</b> the dial turns with your phone — red N is true north, the <b>green arc is where the aurora band sits</b>. “Rotate” says how far to turn (✓ when you\'re facing it), “tilt” is how high above the horizon to look (0° = flat horizon), “band edge” is the ground distance to where the glow starts.',
+  compass: '<b>How to use:</b> the dial turns with your phone — red N is true north, the <b>green arc is where the aurora band sits</b>. “Rotate” says how far to turn (✓ when you\'re facing it), “tilt” is how high above the horizon to look (0° = flat horizon), “band edge” is the ground distance to where the glow starts. <b>If north seems wrong:</b> the phone\'s magnetometer needs calibrating — wave the phone in a slow figure-8 a few times, and stand clear of the car and any magnetic / MagSafe case (both swing a phone compass hard).',
   sky: '<b>OVATION</b> is NOAA\'s live model of the auroral oval, updated every few minutes from the solar wind measured ~40 min upstream. The green band is where the glow should sit in <b>your</b> sky; the crosshair is where your phone points. The shimmer is simulated — brightness scales with the model\'s intensity.',
   clouds: '<b>Low / Mid / High = three cloud layers</b> for your exact spot, next 12 h. Cells are drawn like clouds against a night sky: <b>pale/bright = cloud, dark = clear</b>. Low cloud kills the show; thin high cirrus often doesn\'t (bright aurora shines through). The note picks the clearest window in the DARK hours (22:00–04:00) — the only ones that matter for aurora.',
   outlook: '<b>NOAA\'s 3-day forecast — max Kp per UTC day.</b> A UTC day starts at 18:00 MDT the evening before, so a date here mostly covers THAT night\'s dark hours. ≥4 reaches Jasper\'s sky; ≥5 is a storm, visible much farther south.',
-  terms: '<b>Geomagnetic lat</b> — your latitude measured from the magnetic pole, the one aurora cares about (Jasper: 53° geographic ≈ 59° magnetic — why it\'s great aurora country). <b>Sun</b> — degrees below the horizon; you want ≤ −6°, and June here bottoms out ~−13°. <b>Compass correction</b> — phones point at magnetic north; true north differs by ~+13°E in the Rockies. Auto-set; edit if you know better.',
+  terms: '<b>Geomagnetic lat</b> — your latitude measured from the magnetic pole, the one aurora cares about (Jasper: 53° geographic ≈ 59° magnetic — why it\'s great aurora country). <b>Sun</b> — degrees below the horizon; you want ≤ −6°, and June here bottoms out ~−13°. <b>Compass correction</b> — a manual nudge, normally leave at 0 (your iPhone already points to true north). If the dial reads consistently wrong by some fixed amount, dial it in here; but figure-8 calibration fixes most errors.',
   dscovr: '<b>Data freshness line.</b> When the numbers above were measured at the DSCOVR satellite (shown in your local time, with age), and when that same parcel of wind reaches Earth — measured time + L1 lead. It updates every minute; if it falls more than ~10 min behind, the feed has a gap (⚠️ appears) — tap ↻ and trust your eyes meanwhile. See the “L1 lead ⓘ” tile for what DSCOVR is.'
 };
 let tipSel = null;

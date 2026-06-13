@@ -54,6 +54,8 @@ header h1 span{color:var(--acc)}
 #engine b{color:var(--fg)}
 canvas{display:block;width:100%}
 #cvCompass{max-width:280px;margin:4px auto}
+#calNote{margin-top:8px;font-size:12px;line-height:1.45;text-align:center}
+#calNote.ok{color:var(--dim)} #calNote.warn{color:var(--warn)} #calNote.bad{color:var(--bad)}
 .point{display:flex;justify-content:space-between;gap:10px;margin-top:8px}
 .pbox{flex:1;background:var(--card2);border-radius:10px;padding:8px 10px;text-align:center}
 .pbox .big{font-size:17px;font-weight:650}
@@ -125,6 +127,7 @@ input.decl{width:52px;background:var(--card2);border:1px solid var(--line);color
       <div class="pbox"><div class="big" id="elevTxt">–</div><div class="sub">tilt</div></div>
       <div class="pbox"><div class="big" id="distTxt">–</div><div class="sub">band edge</div></div>
     </div>
+    <div id="calNote" class="ok"></div>
   </div>
 
   <div class="card">
@@ -154,6 +157,6 @@ input.decl{width:52px;background:var(--card2);border:1px solid var(--line);color
       A 5–10 s night-mode photo sees more than your eyes.</div>
   </div>
 </div>
-<script src="app.js?v=108"></script>
+<script src="app.js?v=109"></script>
 </body>
 </html>
