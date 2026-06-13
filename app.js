@@ -131,7 +131,7 @@ if (typeof module !== 'undefined') {
 /* ---------------- DOM app ---------------- */
 if (typeof window !== 'undefined' && typeof document !== 'undefined') {
 
-const APP_VERSION = 110;
+const APP_VERSION = 111;
 
 if ('serviceWorker' in navigator) {
   try { navigator.serviceWorker.register('sw.js'); } catch (e) {}
@@ -554,13 +554,6 @@ function drawKp() {
   if (!up.length) return;
   const x0 = 4, top = 12, yb = h - 24, N = up.length, bw = (w - x0 - 4) / N;
   const yOf = kp => yb - Math.min(9, kp) / 9 * (yb - top);
-  ctx.setLineDash([3, 3]); ctx.lineWidth = 1;
-  [['Kp4', 4], ['Kp5', 5]].forEach(([lbl, k]) => {
-    const y = yOf(k); ctx.strokeStyle = '#243352';
-    ctx.beginPath(); ctx.moveTo(x0, y); ctx.lineTo(w - 2, y); ctx.stroke();
-    ctx.fillStyle = '#5b6f96'; ctx.font = '9px sans-serif'; ctx.textAlign = 'left'; ctx.fillText(lbl, x0 + 1, y - 2);
-  });
-  ctx.setLineDash([]);
   let darkPeak = null, anyPeak = null;
   up.forEach((r, i) => {
     const hr = r.t.getHours(), night = (hr >= 21 || hr <= 4), x = x0 + i * bw;
@@ -578,6 +571,15 @@ function drawKp() {
     }
   });
   ctx.strokeStyle = '#33415f'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(x0, yb); ctx.lineTo(w - 2, yb); ctx.stroke();
+  // threshold lines drawn ON TOP so they stay readable over the bars
+  ctx.setLineDash([5, 3]); ctx.lineWidth = 1.4;
+  [['Kp 4 — reaches Jasper', 4, 'rgba(255,180,84,.85)', '#ffce8f'],
+   ['Kp 5 — storm', 5, 'rgba(120,255,184,.9)', '#a6ffcf']].forEach(([lbl, k, line, txt]) => {
+    const y = yOf(k); ctx.strokeStyle = line;
+    ctx.beginPath(); ctx.moveTo(x0, y); ctx.lineTo(w - 2, y); ctx.stroke();
+    ctx.fillStyle = txt; ctx.font = '600 9.5px sans-serif'; ctx.textAlign = 'right'; ctx.fillText(lbl, w - 3, y - 3);
+  });
+  ctx.setLineDash([]);
   let note = '';
   if (darkPeak) note = '🌙 Dark-hours peak Kp ' + darkPeak.kp.toFixed(1) + ' at ' + fmtT(darkPeak.t) + (darkPeak.g ? ' (' + darkPeak.g + ')' : '');
   if (anyPeak && !(anyPeak.t.getHours() >= 21 || anyPeak.t.getHours() <= 4) && (!darkPeak || anyPeak.kp > darkPeak.kp + 0.4))
