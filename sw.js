@@ -1,5 +1,5 @@
 /* Aurora Compass service worker — shell cache so the app opens with no network. */
-const V = '112';
+const V = '113';
 const SHELL = 'ac-shell-' + V;
 const ASSETS = ['.', 'index.html', 'app.js?v=' + V, 'manifest.json', 'icon.svg'];
 

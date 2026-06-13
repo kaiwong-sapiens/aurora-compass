@@ -131,7 +131,7 @@ if (typeof module !== 'undefined') {
 /* ---------------- DOM app ---------------- */
 if (typeof window !== 'undefined' && typeof document !== 'undefined') {
 
-const APP_VERSION = 112;
+const APP_VERSION = 113;
 
 if ('serviceWorker' in navigator) {
   try { navigator.serviceWorker.register('sw.js'); } catch (e) {}
@@ -561,7 +561,7 @@ function drawKp() {
   for (let px = 0; px < plotW; px += 3) {
     const el = sunAt(t0 + (px / plotW) * (tEnd - t0));
     const d = Math.max(0, Math.min(1, (6 - el) / 24));   // 0 = full daylight, 1 = astronomical night
-    const r = Math.round(40 - 33 * d), g = Math.round(56 - 45 * d), b = Math.round(92 - 70 * d);
+    const r = Math.round(58 - 52 * d), g = Math.round(80 - 70 * d), b = Math.round(124 - 104 * d);
     ctx.fillStyle = 'rgb(' + r + ',' + g + ',' + b + ')';
     ctx.fillRect(x0 + px, top, 3, yb - top);
   }
