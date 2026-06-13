@@ -131,7 +131,7 @@ if (typeof module !== 'undefined') {
 /* ---------------- DOM app ---------------- */
 if (typeof window !== 'undefined' && typeof document !== 'undefined') {
 
-const APP_VERSION = 113;
+const APP_VERSION = 114;
 
 if ('serviceWorker' in navigator) {
   try { navigator.serviceWorker.register('sw.js'); } catch (e) {}
@@ -568,9 +568,13 @@ function drawKp() {
   up.forEach((r, i) => {
     const x = x0 + i * bw, dark = sunAt(r.t.getTime() + 5400000) < -6;  // dark at bin midpoint
     const y = yOf(r.kp);
-    const col = r.kp >= 5 ? '#8affc0' : r.kp >= 4 ? '#59ffa0' : r.kp >= 3 ? '#ffb454' : '#46506e';
-    ctx.globalAlpha = r.past ? 0.4 : 1;
-    ctx.fillStyle = col; ctx.fillRect(x + 1.5, y, Math.max(1, bw - 3), yb - y);
+    const col = r.kp >= 5 ? '#8affc0' : r.kp >= 4 ? '#59ffa0' : r.kp >= 3 ? '#ffb454' : '#9fb4d8';
+    const bx = x + 1.5, bwid = Math.max(1, bw - 3), bh = yb - y;
+    ctx.globalAlpha = r.past ? 0.45 : 1;
+    ctx.fillStyle = col; ctx.fillRect(bx, y, bwid, bh);
+    // dark outline so even low bars stay visible over the bright daytime background
+    ctx.globalAlpha = r.past ? 0.35 : 0.8;
+    ctx.strokeStyle = 'rgba(2,6,12,.9)'; ctx.lineWidth = 1; ctx.strokeRect(bx + 0.5, y + 0.5, bwid - 1, bh - 0.5);
     ctx.globalAlpha = 1;
     if (r.g) { ctx.fillStyle = '#cfeede'; ctx.font = '8px sans-serif'; ctx.textAlign = 'center'; ctx.fillText(r.g, x + bw / 2, y - 2); }
     if (i % 2 === 0) { ctx.fillStyle = '#c3cfe6'; ctx.font = '9px sans-serif'; ctx.textAlign = 'center'; ctx.fillText(fmtT(r.t), x + bw / 2, h - 9); }
@@ -612,7 +616,7 @@ const TIPS = {
   compass: '<b>How to use:</b> the dial turns with your phone — red N is true north, the <b>green arc is where the aurora band sits</b>. “Rotate” says how far to turn (✓ when you\'re facing it), “tilt” is how high above the horizon to look (0° = flat horizon), “band edge” is the ground distance to where the glow starts. <b>If north seems wrong:</b> the phone\'s magnetometer needs calibrating — wave the phone in a slow figure-8 a few times, and stand clear of the car and any magnetic / MagSafe case (both swing a phone compass hard).',
   sky: '<b>OVATION</b> is NOAA\'s live model of the auroral oval, updated every few minutes from the solar wind measured ~40 min upstream. The green band is where the glow should sit in <b>your</b> sky; the crosshair is where your phone points. The shimmer is simulated — brightness scales with the model\'s intensity.',
   clouds: '<b>Low / Mid / High = three cloud layers</b> for your exact spot, next 12 h. Cells are drawn like clouds against a night sky: <b>pale/bright = cloud, dark = clear</b>. Low cloud kills the show; thin high cirrus often doesn\'t (bright aurora shines through). The note picks the clearest window in the DARK hours (22:00–04:00) — the only ones that matter for aurora.',
-  outlook: '<b>3-hourly Kp forecast (NOAA), in your local time</b> — Kp is defined in 3-hour blocks, so this is the finest a Kp forecast gets. <b>Shaded bars = your dark hours</b> (the only ones that count); faded = already past; G1–G5 marks storm bars. Dashed lines = Kp 4 (reaches Jasper) and Kp 5 (storm). Watch for a big spike landing in daylight — it\'s wasted. For finer-than-3h timing, use the live Bz / L1-lead up top.',
+  outlook: '<b>3-hourly Kp forecast (NOAA), in your local time</b> — Kp is defined in 3-hour blocks, so this is the finest a Kp forecast gets. The <b>background fades from daylight (lighter) to night (darker)</b> by the real sun position — the dark stretch is your viewing window. Faded bars = already past; G1–G5 mark storm bars; dashed lines = Kp 4 (reaches Jasper) and Kp 5 (storm). Watch for a big spike landing in daylight — it\'s wasted. For finer-than-3h timing, use the live Bz / L1-lead up top.',
   terms: '<b>Geomagnetic lat</b> — your latitude measured from the magnetic pole, the one aurora cares about (Jasper: 53° geographic ≈ 59° magnetic — why it\'s great aurora country). <b>Sun</b> — degrees below the horizon; you want ≤ −6°, and June here bottoms out ~−13°. <b>Compass correction</b> — a manual nudge, normally leave at 0 (your iPhone already points to true north). If the dial reads consistently wrong by some fixed amount, dial it in here; but figure-8 calibration fixes most errors.',
   dscovr: '<b>Data freshness line.</b> When the numbers above were measured at the DSCOVR satellite (shown in your local time, with age), and when that same parcel of wind reaches Earth — measured time + L1 lead. It updates every minute; if it falls more than ~10 min behind, the feed has a gap (⚠️ appears) — tap ↻ and trust your eyes meanwhile. See the “L1 lead ⓘ” tile for what DSCOVR is.'
 };
