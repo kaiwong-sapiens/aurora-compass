@@ -50,14 +50,6 @@ function geomagLat(lat, lon) {
   return toDeg(Math.asin(Math.sin(p) * Math.sin(pp) + Math.cos(p) * Math.cos(pp) * Math.cos(l - lp)));
 }
 
-// Crude regional magnetic declination (deg E positive) — editable in UI.
-function declEstimate(lat, lon) {
-  if (lon >= -145 && lon < -100 && lat > 40) return 13;   // western Canada
-  if (lon >= -100 && lon < -55 && lat > 40) return -10;   // eastern Canada
-  if (lon >= -10 && lon <= 5 && lat > 45) return 1;       // UK / W Europe
-  return 0;
-}
-
 function parseOvation(j) {
   const cols = [];
   for (let i = 0; i < 360; i++) cols.push(new Uint8Array(91));
@@ -82,7 +74,7 @@ function computeAurora(ov, lat, lon) {
   const m = analyzeLon(ov.cols, lon);
   const res = { peakVal: m.peakVal, boundaryLat: m.boundary, peakLat: m.peakLat,
                 status: 'quiet', az: 0, azW: -35, azE: 35, elevLow: 0, elevTop: 0, distKm: 0 };
-  if (m.peakVal < 3) return res;
+  if (m.peakVal < OVAL_THRESH) return res;  // below the visible band edge → treat as quiet (matches makeVerdict)
   const bLat = m.boundary >= 0 ? m.boundary : m.peakLat;
   if (bLat <= lat + 1) {
     return Object.assign(res, { status: 'overhead', az: 0, elevLow: 50, elevTop: 88, distKm: 0 });
@@ -125,13 +117,13 @@ function lastValid(rows, idx) {  // SWPC "products" format: rows[0]=header
 
 if (typeof module !== 'undefined') {
   module.exports = { bearingTo, angDist, elevationOf, sunElevation, geomagLat,
-    declEstimate, parseOvation, analyzeLon, computeAurora, makeVerdict, lastValid, norm360 };
+    parseOvation, analyzeLon, computeAurora, makeVerdict, lastValid, norm360 };
 }
 
 /* ---------------- DOM app ---------------- */
 if (typeof window !== 'undefined' && typeof document !== 'undefined') {
 
-const APP_VERSION = 114;
+const APP_VERSION = 115;
 
 if ('serviceWorker' in navigator) {
   try { navigator.serviceWorker.register('sw.js'); } catch (e) {}
@@ -497,7 +489,7 @@ function tick(t) {
     if (S.ov) S.aur = computeAurora(S.ov, S.loc.lat, S.loc.lon);
   }
   $('vKp').textContent = S.kp != null ? S.kp.toFixed(1) : '–';
-  if (S.kp != null) $('vKp').className = S.kp >= 5 ? 'bad' : S.kp >= 4 ? 'good' : S.kp >= 3 ? 'warn' : '';
+  if (S.kp != null) $('vKp').className = S.kp >= 4 ? 'good' : S.kp >= 3 ? 'warn' : '';  // higher Kp = better for aurora (green), consistent with the chart
   $('vBz').textContent = S.bz != null ? S.bz.toFixed(1) : '–';
   if (S.bz != null) $('vBz').className = S.bz <= -5 ? 'good' : S.bz < 0 ? 'warn' : '';
   $('vWind').textContent = S.speed != null ? Math.round(S.speed) : '–';
