@@ -131,7 +131,7 @@ if (typeof module !== 'undefined') {
 /* ---------------- DOM app ---------------- */
 if (typeof window !== 'undefined' && typeof document !== 'undefined') {
 
-const APP_VERSION = 111;
+const APP_VERSION = 112;
 
 if ('serviceWorker' in navigator) {
   try { navigator.serviceWorker.register('sw.js'); } catch (e) {}
@@ -555,19 +555,28 @@ function drawKp() {
   const x0 = 4, top = 12, yb = h - 24, N = up.length, bw = (w - x0 - 4) / N;
   const yOf = kp => yb - Math.min(9, kp) / 9 * (yb - top);
   let darkPeak = null, anyPeak = null;
+  // smooth day→night background painted from the sun's elevation at this spot/time
+  const plotW = w - x0 - 4, t0 = up[0].t.getTime(), tEnd = up[N - 1].t.getTime() + 3 * 3600 * 1000;
+  const sunAt = ms => S.loc ? sunElevation(new Date(ms), S.loc.lat, S.loc.lon) : -18;
+  for (let px = 0; px < plotW; px += 3) {
+    const el = sunAt(t0 + (px / plotW) * (tEnd - t0));
+    const d = Math.max(0, Math.min(1, (6 - el) / 24));   // 0 = full daylight, 1 = astronomical night
+    const r = Math.round(40 - 33 * d), g = Math.round(56 - 45 * d), b = Math.round(92 - 70 * d);
+    ctx.fillStyle = 'rgb(' + r + ',' + g + ',' + b + ')';
+    ctx.fillRect(x0 + px, top, 3, yb - top);
+  }
   up.forEach((r, i) => {
-    const hr = r.t.getHours(), night = (hr >= 21 || hr <= 4), x = x0 + i * bw;
-    if (night) { ctx.fillStyle = 'rgba(40,60,100,.30)'; ctx.fillRect(x, top, bw, yb - top); }
+    const x = x0 + i * bw, dark = sunAt(r.t.getTime() + 5400000) < -6;  // dark at bin midpoint
     const y = yOf(r.kp);
     const col = r.kp >= 5 ? '#8affc0' : r.kp >= 4 ? '#59ffa0' : r.kp >= 3 ? '#ffb454' : '#46506e';
     ctx.globalAlpha = r.past ? 0.4 : 1;
     ctx.fillStyle = col; ctx.fillRect(x + 1.5, y, Math.max(1, bw - 3), yb - y);
     ctx.globalAlpha = 1;
     if (r.g) { ctx.fillStyle = '#cfeede'; ctx.font = '8px sans-serif'; ctx.textAlign = 'center'; ctx.fillText(r.g, x + bw / 2, y - 2); }
-    if (i % 2 === 0) { ctx.fillStyle = '#7f93b3'; ctx.font = '9px sans-serif'; ctx.textAlign = 'center'; ctx.fillText(fmtT(r.t), x + bw / 2, h - 9); }
+    if (i % 2 === 0) { ctx.fillStyle = '#c3cfe6'; ctx.font = '9px sans-serif'; ctx.textAlign = 'center'; ctx.fillText(fmtT(r.t), x + bw / 2, h - 9); }
     if (!r.past) {
       if (!anyPeak || r.kp > anyPeak.kp) anyPeak = r;
-      if (night && (!darkPeak || r.kp > darkPeak.kp)) darkPeak = r;
+      if (dark && (!darkPeak || r.kp > darkPeak.kp)) darkPeak = r;
     }
   });
   ctx.strokeStyle = '#33415f'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(x0, yb); ctx.lineTo(w - 2, yb); ctx.stroke();
@@ -582,9 +591,9 @@ function drawKp() {
   ctx.setLineDash([]);
   let note = '';
   if (darkPeak) note = '🌙 Dark-hours peak Kp ' + darkPeak.kp.toFixed(1) + ' at ' + fmtT(darkPeak.t) + (darkPeak.g ? ' (' + darkPeak.g + ')' : '');
-  if (anyPeak && !(anyPeak.t.getHours() >= 21 || anyPeak.t.getHours() <= 4) && (!darkPeak || anyPeak.kp > darkPeak.kp + 0.4))
+  if (anyPeak && sunAt(anyPeak.t.getTime() + 5400000) > -6 && (!darkPeak || anyPeak.kp > darkPeak.kp + 0.4))
     note += (note ? ' · ' : '') + '⚠️ biggest spike Kp ' + anyPeak.kp.toFixed(1) + ' at ' + fmtT(anyPeak.t) + ' is in daylight';
-  $('kpNote').textContent = note || 'shaded = your dark hours · faded = already past';
+  $('kpNote').textContent = note || 'background = daylight (lighter) → night (darker) · faded bars = past';
 }
 
 let last = 0;
